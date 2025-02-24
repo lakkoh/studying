@@ -77,17 +77,27 @@ function validate_param() {
     local value="$1"
     local pattern="$2" 
     local message="$3"
+    local check_existance="${4:-false}"
 
     if [[ ! "$value" =~ $pattern ]]; then
         echo "$message"
         exit 1
     fi
+
+	if [[ "$check_existance" == true ]]; then
+		if [[ ! -d "/sys/class/net/$value" ]]; then
+			echo "Intarface $value does not exist";
+			exit 1
+		fi
+	fi
 }
 
 validate_param "$PREFIX" '^[0-9]+\.[0-9]+$' "Invalid PREFIX format. Must be X.X"
-validate_param "$INTERFACE" '^[a-zA-Z0-9_-]+$' "Invalid INTERFACE name"
+validate_param "$INTERFACE" '^[a-zA-Z0-9_-]+$' "Invalid INTERFACE name" true
 [[ -n "$SUBNET" ]] && validate_param "$SUBNET" '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$' "Invalid SUBNET (0-255)"
 [[ -n "$HOST" ]] && validate_param "$HOST" '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$' "Invalid HOST (0-255)"
+
+
 
 # Определение диапазонов сканирования
 if [[ -z "$SUBNET" ]]; then
