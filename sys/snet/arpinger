@@ -1,0 +1,112 @@
+#!/bin/bash
+
+trap 'printf "\nPing exit (Ctrl-C)\n"; exit 1' 2
+
+# Подсказка
+
+function show_help() {
+    printf "\nUsage: $(basename "$0") -p PREFIX -i INTERFACE [-s SUBNET] [-h HOST]\n"
+    printf "Example: $(basename "$0") -p 192.168 -i eth0 -s 1 -h 24\n\n"
+    printf "Options:\n"
+    printf "  -p, --prefix PREFIX    First two octets of the IP address (e.g., 192.168)\n"
+    printf "  -i, --interface INTERFACE  Network interface (e.g., eth0)\n"
+    printf "  -s, --subnet SUBNET    Subnet to scan (e.g., 1 for 192.168.1.*)\n"
+    printf "  -h, --host HOST        Host to scan (e.g., 24 for 192.168.1.24)\n"
+    printf "  --help                 Show this help message and exit\n\n"
+    printf "Description:\n"
+    printf "  $(basename "$0") is an arping script that allows you to scan IP\n"
+    printf "  addresses in a specified range. By default, the script scans all\n"
+    printf "  addresses of the specified prefix, unless a specific subnet or\n"
+    printf "  address is passed.\n\n"
+}
+
+# проверка прав администратора
+
+if [[ $EUID -ne 0 ]]; then
+    echo "This script must be run as root"
+    exit 1
+fi
+
+# Инициализация переменных
+
+PREFIX=""
+INTERFACE=""
+SUBNET=""
+HOST=""
+
+# Обработка аргументов
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -p|--prefix)
+            PREFIX="$2"
+            shift 2
+            ;;
+        -i|--interface)
+            INTERFACE="$2"
+            shift 2
+            ;;
+        -s|--subnet)
+            SUBNET="$2"
+            shift 2
+            ;;
+        -h|--host)
+            HOST="$2"
+            shift 2
+            ;;
+        --help)
+            show_help
+            exit 1
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Проверка обязательных параметров
+
+if [[ -z "$PREFIX" || -z "$INTERFACE" ]]; then
+    printf "\nError: missing required arguments!\nDo \"$(basename "$0") --help\" to show usage.\n\n"
+    exit 1
+fi
+
+# Валидация параметров с регулярными выражениями
+function validate_param() {
+    local value="$1"
+    local pattern="$2" 
+    local message="$3"
+
+    if [[ ! "$value" =~ $pattern ]]; then
+        echo "$message"
+        exit 1
+    fi
+}
+
+validate_param "$PREFIX" '^[0-9]+\.[0-9]+$' "Invalid PREFIX format. Must be X.X"
+validate_param "$INTERFACE" '^[a-zA-Z0-9_-]+$' "Invalid INTERFACE name"
+[[ -n "$SUBNET" ]] && validate_param "$SUBNET" '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$' "Invalid SUBNET (0-255)"
+[[ -n "$HOST" ]] && validate_param "$HOST" '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$' "Invalid HOST (0-255)"
+
+# Определение диапазонов сканирования
+if [[ -z "$SUBNET" ]]; then
+	subnets=($(seq 0 255))
+else
+	subnets=("$SUBNET")
+fi
+
+if [[ -z "$HOST" ]]; then
+	hosts=($(seq 1 255))
+else
+	hosts=("$HOST")
+fi
+
+# Сканирование
+for subnet in "${subnets[@]}"; do
+    for host in "${hosts[@]}"; do
+        ip="${PREFIX}.${subnet}.${host}"
+        echo "[*] Scanning $ip"
+        arping -c 3 -I "$INTERFACE" "$ip" 2> /dev/null
+    done
+done
