@@ -84,12 +84,12 @@ function validate_param() {
         exit 1
     fi
 
-	if [[ "$check_existance" == true ]]; then
-		if [[ ! -d "/sys/class/net/$value" ]]; then
-			echo "Intarface $value does not exist";
-			exit 1
-		fi
-	fi
+    if [[ "$check_existance" == true ]]; then
+        if [[ ! -d "/sys/class/net/$value" ]]; then
+            echo "Intarface $value does not exist";
+            exit 1
+        fi
+    fi
 }
 
 validate_param "$PREFIX" '^[0-9]+\.[0-9]+$' "Invalid PREFIX format. Must be X.X"
